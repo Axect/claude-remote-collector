@@ -16,7 +16,10 @@ def test_record_valid_url(tmp_path: Path):
         from collector.cli import cmd_record
         import argparse
 
-        args = argparse.Namespace(url="https://claude.ai/code/session_01XNYXVWynq7cb6rsR4inaM3")
+        args = argparse.Namespace(
+            url="https://claude.ai/code/session_01XNYXVWynq7cb6rsR4inaM3",
+            source="wrapper",
+        )
         cmd_record(args)
 
     entries = store.read_all()
@@ -26,11 +29,32 @@ def test_record_valid_url(tmp_path: Path):
     assert entries[0].source == "wrapper"
 
 
+def test_record_with_source(tmp_path: Path):
+    store = storage.Storage(base_dir=tmp_path / "sessions")
+
+    with patch("collector.cli.storage.Storage", return_value=store):
+        from collector.cli import cmd_record
+        import argparse
+
+        args = argparse.Namespace(
+            url="https://claude.ai/code/session_01XNYXVWynq7cb6rsR4inaM3",
+            source="startup",
+        )
+        cmd_record(args)
+
+    entries = store.read_all()
+    assert len(entries) == 1
+    assert entries[0].source == "startup"
+
+
 def test_record_invalid_url():
     import argparse
     from collector.cli import cmd_record
 
-    args = argparse.Namespace(url="https://example.com/not-a-session")
+    args = argparse.Namespace(
+        url="https://example.com/not-a-session",
+        source="wrapper",
+    )
     with pytest.raises(SystemExit) as exc_info:
         cmd_record(args)
     assert exc_info.value.code == 1

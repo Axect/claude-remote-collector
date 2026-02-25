@@ -112,7 +112,7 @@ def cmd_record(args: argparse.Namespace) -> None:
         session_id=session_id,
         url=url,
         cwd=os.getcwd(),
-        source="wrapper",
+        source=args.source,
     )
     store = storage.Storage()
     store.append(entry)
@@ -174,6 +174,7 @@ def main() -> None:
     # record (called by shell wrappers)
     p_record = sub.add_parser("record", help="Record a session URL (used by shell wrappers)")
     p_record.add_argument("--url", required=True, help="Session URL to record")
+    p_record.add_argument("--source", default="wrapper", help="Source label (startup/exit/wrapper)")
 
     # path
     p_path = sub.add_parser("path", help="Print the storage file path")

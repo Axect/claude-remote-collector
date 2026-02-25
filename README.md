@@ -27,11 +27,14 @@ Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
 git clone <repo-url> && cd claude-remote-collector
 uv sync
 
+# Make the CLI available globally
+uv tool install -e .
+
 # Install the shell wrapper for your shell
-uv run claude-remote-collector install fish   # Fish
-uv run claude-remote-collector install bash   # Bash
-uv run claude-remote-collector install zsh    # Zsh
-uv run claude-remote-collector install all    # All shells
+claude-remote-collector install fish   # Fish
+claude-remote-collector install bash   # Bash
+claude-remote-collector install zsh    # Zsh
+claude-remote-collector install all    # All shells
 ```
 
 Or install manually without the CLI:
