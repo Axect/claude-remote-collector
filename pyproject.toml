@@ -1,6 +1,6 @@
 [project]
 name = "claude-remote-collector"
-version = "0.1.0"
+version = "0.2.0"
 description = "Automatically collect Claude Code remote session links"
 requires-python = ">=3.12"
 dependencies = []

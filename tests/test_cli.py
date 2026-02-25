@@ -19,6 +19,7 @@ def test_record_valid_url(tmp_path: Path):
         args = argparse.Namespace(
             url="https://claude.ai/code/session_01XNYXVWynq7cb6rsR4inaM3",
             source="wrapper",
+            notify=False,
         )
         cmd_record(args)
 
@@ -39,6 +40,7 @@ def test_record_with_source(tmp_path: Path):
         args = argparse.Namespace(
             url="https://claude.ai/code/session_01XNYXVWynq7cb6rsR4inaM3",
             source="startup",
+            notify=False,
         )
         cmd_record(args)
 

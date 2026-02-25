@@ -8,8 +8,9 @@ import sys
 import time
 from datetime import datetime, timezone
 
-from collector import storage, wrapper
+from collector import config, storage, wrapper
 from collector.capture import URL_PATTERN
+from collector.notifier import notify as send_notify
 
 
 def cmd_install(args: argparse.Namespace) -> None:
@@ -117,6 +118,92 @@ def cmd_record(args: argparse.Namespace) -> None:
     store = storage.Storage()
     store.append(entry)
 
+    # Auto-notify if --notify flag or auto_notify config
+    cfg = config.load_config()
+    should_notify = args.notify or cfg.get("notify", {}).get("auto_notify", False)
+    if should_notify and cfg.get("notify", {}).get("enabled", False):
+        result = send_notify(entry, cfg)
+        if not result.success:
+            print(f"Notify failed: {result.message}", file=sys.stderr)
+
+
+def cmd_notify(args: argparse.Namespace) -> None:
+    cfg = config.load_config()
+    if not cfg.get("notify", {}).get("enabled", False):
+        print("Notifications are disabled. Enable with:", file=sys.stderr)
+        print("  claude-remote-collector config set notify.enabled true", file=sys.stderr)
+        sys.exit(1)
+
+    if args.url:
+        url = args.url.strip()
+        if not URL_PATTERN.fullmatch(url):
+            print(f"Invalid session URL: {url}", file=sys.stderr)
+            sys.exit(1)
+        session_id = url.split("session_", 1)[-1]
+        entry = storage.SessionEntry(
+            timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            session_id=session_id,
+            url=url,
+        )
+    else:
+        store = storage.Storage()
+        entries = store.read_latest(1)
+        if not entries:
+            print("No sessions to notify about.", file=sys.stderr)
+            sys.exit(1)
+        entry = entries[0]
+
+    result = send_notify(entry, cfg)
+    if result.success:
+        print(f"[{result.method}] {result.message}")
+    else:
+        print(f"[{result.method}] Failed: {result.message}", file=sys.stderr)
+        sys.exit(1)
+
+
+def cmd_config(args: argparse.Namespace) -> None:
+    if args.config_action == "show":
+        cfg = config.load_config()
+        for section_key in sorted(cfg.keys()):
+            if section_key == "_root":
+                continue
+            section = cfg[section_key]
+            if not isinstance(section, dict):
+                continue
+            print(f"[{section_key}]")
+            for k, v in section.items():
+                # Mask sensitive values
+                display = _mask_sensitive(k, v)
+                print(f"  {k} = {display}")
+            print()
+    elif args.config_action == "set":
+        config.set_value(args.key, args.value)
+        print(f"Set {args.key} = {args.value}")
+    elif args.config_action == "get":
+        cfg = config.load_config()
+        val = config.get_value(cfg, args.key)
+        if val is not None:
+            print(val)
+        else:
+            print(f"Key not found: {args.key}", file=sys.stderr)
+            sys.exit(1)
+    elif args.config_action == "path":
+        print(config.CONFIG_FILE)
+
+
+def _mask_sensitive(key: str, value: object) -> str:
+    """Mask sensitive config values like tokens."""
+    s = str(value)
+    if key in ("bot_token",) and len(s) > 8:
+        return s[:4] + "***" + s[-4:]
+    return s
+
+
+def cmd_setup(args: argparse.Namespace) -> None:
+    from collector.setup import run_setup
+
+    run_setup(args.backend)
+
 
 def cmd_path(args: argparse.Namespace) -> None:
     store = storage.Storage()
@@ -175,6 +262,32 @@ def main() -> None:
     p_record = sub.add_parser("record", help="Record a session URL (used by shell wrappers)")
     p_record.add_argument("--url", required=True, help="Session URL to record")
     p_record.add_argument("--source", default="wrapper", help="Source label (startup/exit/wrapper)")
+    p_record.add_argument("--notify", action="store_true", help="Send notification after recording")
+
+    # setup (interactive wizard)
+    p_setup = sub.add_parser("setup", help="Interactive notification setup wizard")
+    p_setup.add_argument(
+        "backend", choices=["telegram", "webhook", "ntfy"],
+        help="Notification backend to configure",
+    )
+
+    # notify
+    p_notify = sub.add_parser("notify", help="Send latest session link via configured backend")
+    p_notify.add_argument("--url", default=None, help="Specific URL to notify (default: latest)")
+
+    # config
+    p_config = sub.add_parser("config", help="Manage notification settings")
+    config_sub = p_config.add_subparsers(dest="config_action")
+
+    config_sub.add_parser("show", help="Show all config values")
+    config_sub.add_parser("path", help="Print config file path")
+
+    p_config_get = config_sub.add_parser("get", help="Get a config value")
+    p_config_get.add_argument("key", help="Config key (e.g. notify.telegram.bot_token)")
+
+    p_config_set = config_sub.add_parser("set", help="Set a config value")
+    p_config_set.add_argument("key", help="Config key (e.g. notify.telegram.bot_token)")
+    p_config_set.add_argument("value", help="Value to set")
 
     # path
     p_path = sub.add_parser("path", help="Print the storage file path")
@@ -191,6 +304,9 @@ def main() -> None:
         "tail": cmd_tail,
         "clean": cmd_clean,
         "record": cmd_record,
+        "setup": cmd_setup,
+        "notify": cmd_notify,
+        "config": cmd_config,
         "path": cmd_path,
     }
 

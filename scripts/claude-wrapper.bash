@@ -22,7 +22,7 @@ claude() {
             if [ -f "$tmpfile" ] && [ -s "$tmpfile" ]; then
                 url=$(grep -Eo "https://claude\.ai/code/session_[^[:space:]]+" "$tmpfile" 2>/dev/null | head -1)
                 if [ -n "$url" ]; then
-                    claude-remote-collector record --url "$url" --source startup 2>/dev/null
+                    claude-remote-collector record --url "$url" --source startup --notify 2>/dev/null
                     touch "$tmpfile.recorded"
                     break
                 fi
@@ -54,7 +54,7 @@ claude() {
         local url
         url=$(grep -Eo 'https://claude\.ai/code/session_[^[:space:]]+' "$tmpfile" | head -1)
         if [[ -n "$url" ]]; then
-            command claude-remote-collector record --url "$url" --source exit 2>/dev/null
+            command claude-remote-collector record --url "$url" --source exit --notify 2>/dev/null
         fi
     fi
 
